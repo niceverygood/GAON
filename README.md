@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 가온 (Gaon)
 
-## Getting Started
+한국 상조 플래너를 위한 올인원 엔딩 플래닝 SaaS.
 
-First, run the development server:
+> 전체 프로젝트 스펙·의사결정은 [`CLAUDE.md`](./CLAUDE.md) 참고.
+
+## 핵심 기능
+
+- **엔딩 시나리오** — 고객 엔딩 플래닝을 AI가 통계 기반으로 시각화
+- **해약 방지 AI** — 매일 리스크 스코어링, 해약 위험 Top 10 제공
+- **장례 실행 AI 매니저** — 3일간 유족·플래너 동행 안내
+
+## 시작하기
 
 ```bash
+cp .env.example .env.local   # 필수 키 채우기
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`http://localhost:3000` 에서 확인.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## DB 마이그레이션
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Supabase 프로젝트 생성 후 SQL 에디터에서:
 
-## Learn More
+```sql
+-- scripts/001_initial_schema.sql 내용 그대로 실행
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 스택
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Next.js (App Router) · Supabase · Claude Sonnet 4.5 · shadcn/ui · Tailwind v4
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 문서
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [CLAUDE.md](./CLAUDE.md) — Single Source of Truth
+- [scripts/](./scripts) — DB 마이그레이션
+- [.env.example](./.env.example) — 환경 변수 템플릿
