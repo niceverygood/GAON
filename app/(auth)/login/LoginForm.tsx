@@ -12,7 +12,9 @@ export function LoginForm() {
   const params = useSearchParams();
   const next = params.get('next') ?? '/dashboard';
   const justSignedUp = params.get('signup') === '1';
-  const oauthError = params.get('error') === 'oauth';
+  const errorKind = params.get('error');
+  const oauthError = errorKind === 'oauth';
+  const envMissing = errorKind === 'supabase_env_missing';
 
   const [state, formAction, pending] = useActionState<AuthState, FormData>(loginAction, null);
 
@@ -26,6 +28,14 @@ export function LoginForm() {
       {oauthError && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           카카오 로그인을 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.
+        </div>
+      )}
+      {envMissing && (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800 leading-relaxed">
+          서버 환경 변수가 설정되지 않았습니다. 운영자는 Vercel Project Settings →
+          Environment Variables 에서 <code className="px-1 bg-rose-100 rounded">NEXT_PUBLIC_SUPABASE_URL</code>{' '}
+          와 <code className="px-1 bg-rose-100 rounded">NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code>{' '}
+          를 추가해 주세요.
         </div>
       )}
 
