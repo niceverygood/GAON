@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { seedDemoPlanner } from '@/lib/demo/seed';
 
 export type AuthState = { error?: string } | null;
 
@@ -112,6 +113,8 @@ export async function loginWithTestAccountAction(
   });
 
   if (!firstTry.error) {
+    // Ensure demo data exists — cheap no-op when the account already has clients.
+    await trySeed(firstTry.data.user?.id);
     redirect('/dashboard');
   }
 
@@ -156,5 +159,24 @@ export async function loginWithTestAccountAction(
     };
   }
 
+  await trySeed(retry.data.user?.id);
   redirect('/dashboard');
+}
+
+/**
+ * Best-effort demo seeding. Swallows errors (including "migrations not run
+ * yet") so a seeding hiccup never blocks the login itself.
+ */
+async function trySeed(plannerId: string | undefined): Promise<void> {
+  if (!plannerId) return;
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return;
+  try {
+    const admin = await createServiceClient();
+    const outcome = await seedDemoPlanner(admin, plannerId);
+    if (outcome.seeded) {
+      console.log('[test-login] seeded demo data:', outcome.clients, 'clients');
+    }
+  } catch (e) {
+    console.error('[test-login] seed failed — login will still proceed', e);
+  }
 }
