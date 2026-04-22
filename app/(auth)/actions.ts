@@ -2,9 +2,14 @@
 
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 
 export type AuthState = { error?: string } | null;
+
+/** Demo credentials — overridable via env. Auto-provisioned on first click. */
+const DEMO_EMAIL = process.env.TEST_ACCOUNT_EMAIL ?? 'demo@gaon.app';
+const DEMO_PASSWORD = process.env.TEST_ACCOUNT_PASSWORD ?? 'GaonDemo!2026';
+const DEMO_NAME = process.env.TEST_ACCOUNT_NAME ?? '테스트 플래너';
 
 function normalize(input: FormDataEntryValue | null): string {
   return typeof input === 'string' ? input.trim() : '';
@@ -83,4 +88,73 @@ export async function signOutAction(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
   redirect('/login');
+}
+
+/**
+ * One-click login for pilots and demos. Auto-provisions the demo user via
+ * service-role if it does not yet exist, then signs in. Requires
+ * `SUPABASE_SERVICE_ROLE_KEY` to be set server-side.
+ */
+export async function loginWithTestAccountAction(
+  _prev: AuthState,
+  _formData: FormData,
+): Promise<AuthState> {
+  void _prev;
+  void _formData;
+  if (!DEMO_EMAIL || !DEMO_PASSWORD) {
+    return { error: '테스트 계정 설정이 누락되었습니다.' };
+  }
+
+  const supabase = await createClient();
+  const firstTry = await supabase.auth.signInWithPassword({
+    email: DEMO_EMAIL,
+    password: DEMO_PASSWORD,
+  });
+
+  if (!firstTry.error) {
+    redirect('/dashboard');
+  }
+
+  // First attempt failed — most likely user not yet provisioned. Try creating
+  // it via service-role and retry. A missing service role key means we cannot
+  // auto-create, so we surface a clear message.
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return {
+      error:
+        '테스트 계정이 아직 생성되지 않았습니다. 운영자가 SUPABASE_SERVICE_ROLE_KEY를 설정하거나 계정을 수동 생성해 주세요.',
+    };
+  }
+
+  try {
+    const admin = await createServiceClient();
+    const { error: createErr } = await admin.auth.admin.createUser({
+      email: DEMO_EMAIL,
+      password: DEMO_PASSWORD,
+      email_confirm: true,
+      user_metadata: { name: DEMO_NAME },
+    });
+
+    // "already registered" is fine — means the password we tried is wrong.
+    if (createErr && !/already|exists|registered/i.test(createErr.message)) {
+      console.error('[test-login] admin.createUser failed', createErr);
+      return { error: '테스트 계정 생성에 실패했습니다.' };
+    }
+  } catch (e) {
+    console.error('[test-login] service client threw', e);
+    return { error: '테스트 계정 생성 중 오류가 발생했습니다.' };
+  }
+
+  const retry = await supabase.auth.signInWithPassword({
+    email: DEMO_EMAIL,
+    password: DEMO_PASSWORD,
+  });
+
+  if (retry.error) {
+    return {
+      error:
+        '테스트 계정 로그인에 실패했습니다. 비밀번호가 변경되었을 수 있습니다. 운영자에게 문의해 주세요.',
+    };
+  }
+
+  redirect('/dashboard');
 }

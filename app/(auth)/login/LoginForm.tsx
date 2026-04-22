@@ -2,11 +2,16 @@
 
 import { useActionState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { loginAction, signInWithKakao, type AuthState } from '../actions';
+import {
+  loginAction,
+  loginWithTestAccountAction,
+  signInWithKakao,
+  type AuthState,
+} from '../actions';
 
 export function LoginForm() {
   const params = useSearchParams();
@@ -17,6 +22,10 @@ export function LoginForm() {
   const envMissing = errorKind === 'supabase_env_missing';
 
   const [state, formAction, pending] = useActionState<AuthState, FormData>(loginAction, null);
+  const [demoState, demoAction, demoPending] = useActionState<AuthState, FormData>(
+    loginWithTestAccountAction,
+    null,
+  );
 
   return (
     <div className="space-y-4">
@@ -99,6 +108,24 @@ export function LoginForm() {
           <MessageCircle className="mr-2 h-4 w-4" />
           카카오로 시작하기
         </Button>
+      </form>
+
+      <form action={demoAction} className="space-y-2">
+        <Button
+          type="submit"
+          variant="outline"
+          disabled={demoPending}
+          className="h-11 w-full border-dashed border-indigo-300 bg-indigo-50/60 text-indigo-700 hover:bg-indigo-100 [a]:hover:bg-indigo-100"
+        >
+          <Sparkles className="mr-2 h-4 w-4" />
+          {demoPending ? '테스트 계정 준비 중…' : '테스트 계정으로 로그인'}
+        </Button>
+        {demoState?.error && (
+          <p className="text-xs text-rose-600 leading-relaxed">{demoState.error}</p>
+        )}
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          데모·파일럿용 자동 생성 계정입니다. 실제 고객 데이터를 입력하지 마세요.
+        </p>
       </form>
     </div>
   );
