@@ -5,6 +5,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
+// Fully static — ISR so the edge serves a cached HTML payload to every visitor
+// and the page never triggers a fresh function invocation on hot paths.
+export const revalidate = 3600;
+
 export default function LandingPage() {
   return (
     <>

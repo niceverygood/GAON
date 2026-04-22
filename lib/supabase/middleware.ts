@@ -10,13 +10,20 @@ const SUPABASE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function updateSession(request: NextRequest) {
-  // If Supabase env vars are not configured (e.g. a Vercel preview without
-  // variables yet), we must NOT throw — every request would 500 before the
-  // landing page renders. Instead: pass through, and push protected routes
-  // to /login with a friendly note so deploy ops are debuggable.
+  const { pathname } = request.nextUrl;
+  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+  const isAuth = AUTH_PREFIXES.some((p) => pathname.startsWith(p));
+
+  // Fast path: public routes (marketing, /share, /auth/callback, etc.) don't
+  // need to know who the user is. Skipping `auth.getUser()` here saves a
+  // Supabase API round-trip on every page load (~150-500ms).
+  if (!isProtected && !isAuth) {
+    return NextResponse.next({ request });
+  }
+
+  // Env guard: in a Vercel preview without vars we redirect protected paths
+  // to /login with an error flag instead of throwing a 500.
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    const { pathname } = request.nextUrl;
-    const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
     if (isProtected) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
@@ -50,13 +57,8 @@ export async function updateSession(request: NextRequest) {
     const result = await supabase.auth.getUser();
     user = result.data.user;
   } catch (err) {
-    // Network / auth-service hiccup should not 500 the entire site.
     console.error('[middleware] supabase.auth.getUser failed', err);
   }
-
-  const { pathname } = request.nextUrl;
-  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
-  const isAuth = AUTH_PREFIXES.some((p) => pathname.startsWith(p));
 
   if (!user && isProtected) {
     const url = request.nextUrl.clone();

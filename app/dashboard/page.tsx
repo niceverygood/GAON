@@ -11,11 +11,13 @@ export const metadata = { title: '대시보드' };
 export default async function DashboardHomePage() {
   const supabase = await createClient();
 
+  // Four lightweight queries in parallel. The retention count uses a HEAD
+  // count on the latest-scores view so no JSON factor payload is shipped.
   const [
     { count: clientCount },
     { count: scenarioCount },
     { data: recentClients },
-    { data: topRisk },
+    riskyRes,
   ] = await Promise.all([
     supabase.from('clients').select('id', { count: 'exact', head: true }),
     supabase.from('ending_scenarios').select('id', { count: 'exact', head: true }),
@@ -24,12 +26,13 @@ export default async function DashboardHomePage() {
       .select('id, name, created_at, birth_date, phone')
       .order('created_at', { ascending: false })
       .limit(5),
-    supabase.rpc('top_retention', { limit_count: 100 }),
+    supabase
+      .from('latest_retention_scores')
+      .select('id', { count: 'exact', head: true })
+      .gte('score', 50),
   ]);
 
-  const risky = Array.isArray(topRisk)
-    ? (topRisk as Array<{ score: number }>).filter((r) => r.score >= 50).length
-    : null;
+  const risky = typeof riskyRes.count === 'number' ? riskyRes.count : null;
 
   return (
     <>

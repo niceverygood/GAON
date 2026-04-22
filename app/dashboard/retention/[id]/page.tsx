@@ -26,33 +26,38 @@ export default async function RetentionDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: contract } = await supabase
-    .from('sangjo_contracts')
-    .select(
-      'id, product_name, monthly_payment, paid_months, total_months, contract_date, status, client_id, clients(id, name, phone)',
-    )
-    .eq('id', id)
-    .maybeSingle<{
-      id: string;
-      product_name: string | null;
-      monthly_payment: number | null;
-      paid_months: number | null;
-      total_months: number | null;
-      contract_date: string | null;
-      status: string;
-      client_id: string;
-      clients: { id: string; name: string; phone: string | null } | null;
-    }>();
+  // Parallel fetch — the two queries are independent (both keyed by contract id).
+  const [contractRes, historyRes] = await Promise.all([
+    supabase
+      .from('sangjo_contracts')
+      .select(
+        'id, product_name, monthly_payment, paid_months, total_months, contract_date, status, client_id, clients(id, name, phone)',
+      )
+      .eq('id', id)
+      .maybeSingle<{
+        id: string;
+        product_name: string | null;
+        monthly_payment: number | null;
+        paid_months: number | null;
+        total_months: number | null;
+        contract_date: string | null;
+        status: string;
+        client_id: string;
+        clients: { id: string; name: string; phone: string | null } | null;
+      }>(),
+    supabase
+      .from('retention_scores')
+      .select('id, score, computed_at, factors, recommended_action')
+      .eq('contract_id', id)
+      .order('computed_at', { ascending: false })
+      .limit(14)
+      .returns<HistoryRow[]>(),
+  ]);
 
+  const contract = contractRes.data;
   if (!contract || !contract.clients) notFound();
 
-  const { data: history } = await supabase
-    .from('retention_scores')
-    .select('id, score, computed_at, factors, recommended_action')
-    .eq('contract_id', id)
-    .order('computed_at', { ascending: false })
-    .limit(14)
-    .returns<HistoryRow[]>();
+  const history = historyRes.data;
 
   const latest = history?.[0];
   const tier: RiskTier | null = latest ? tierOf(latest.score) : null;

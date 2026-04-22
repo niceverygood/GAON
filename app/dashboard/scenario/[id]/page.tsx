@@ -11,6 +11,15 @@ import { ShareButton } from './ShareButton';
 
 export const metadata = { title: '시나리오 상세' };
 
+type ContractRow = {
+  product_name: string | null;
+  monthly_payment: number | null;
+  total_months: number | null;
+  paid_months: number | null;
+  status: string;
+  created_at: string;
+};
+
 type Row = {
   id: string;
   client_id: string;
@@ -18,17 +27,29 @@ type Row = {
   model: string | null;
   share_token: string | null;
   result: ScenarioResult;
-  clients: { name: string; birth_date: string | null; address: string | null } | null;
+  clients: {
+    name: string;
+    birth_date: string | null;
+    address: string | null;
+    sangjo_contracts: ContractRow[] | null;
+  } | null;
 };
 
 export default async function ScenarioDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
 
+  // Single round-trip: scenario + client + that client's contracts in one
+  // nested select. Collapsing the former two sequential queries into one
+  // shaves a Supabase round-trip (~80-200ms).
   const { data } = await supabase
     .from('ending_scenarios')
     .select(
-      'id, client_id, created_at, model, share_token, result, clients(name, birth_date, address)',
+      `id, client_id, created_at, model, share_token, result,
+       clients(
+         name, birth_date, address,
+         sangjo_contracts(product_name, monthly_payment, total_months, paid_months, status, created_at)
+       )`,
     )
     .eq('id', id)
     .maybeSingle<Row>();
@@ -38,28 +59,19 @@ export default async function ScenarioDetailPage({ params }: { params: Promise<{
   const name = data.clients?.name ?? '고객';
   const tier = detectTier(data.clients?.address);
 
-  // Pull active contract (if any) to feed the funeral-cost gap visualization.
-  const { data: contract } = await supabase
-    .from('sangjo_contracts')
-    .select('product_name, monthly_payment, total_months, paid_months')
-    .eq('client_id', data.client_id)
-    .eq('status', 'active')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle<{
-      product_name: string | null;
-      monthly_payment: number | null;
-      total_months: number | null;
-      paid_months: number | null;
-    }>();
+  // Pick the most recent active contract for the cost-gap visualization.
+  const activeContract =
+    data.clients?.sangjo_contracts
+      ?.filter((c) => c.status === 'active')
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0] ?? null;
 
   const existing =
-    contract && contract.monthly_payment && contract.total_months
+    activeContract && activeContract.monthly_payment && activeContract.total_months
       ? {
-          monthlyKrw: contract.monthly_payment,
-          totalMonths: contract.total_months,
-          paidMonths: contract.paid_months ?? 0,
-          productName: contract.product_name,
+          monthlyKrw: activeContract.monthly_payment,
+          totalMonths: activeContract.total_months,
+          paidMonths: activeContract.paid_months ?? 0,
+          productName: activeContract.product_name,
         }
       : null;
 
