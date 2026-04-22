@@ -5,9 +5,11 @@ const PROTECTED_PREFIXES = ['/dashboard', '/manager', '/admin'];
 const AUTH_PREFIXES = ['/login', '/signup'];
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+// Prefer the legacy anon key — @supabase/ssr v0.10 handles its JWT session
+// wiring more reliably than the newer sb_publishable_ format.
 const SUPABASE_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
